@@ -48,6 +48,8 @@ ENGINE_DEFAULT = {
 ENGINE_BIN = Path(__file__).parent.parent / "engine" / "build" / "adaptivex"
 engine_proc: subprocess.Popen | None = None
 engine_task: asyncio.Task | None = None
+engine_config = ENGINE_DEFAULT.copy()
+engine_lock = asyncio.Lock()
 
 # ─── WebSocket broadcast ──────────────────────────────────────
 async def broadcast(payload: dict):
@@ -109,7 +111,8 @@ async def run_engine(engine_cfg: dict):
             pass  # skip malformed lines
 
     await engine_proc.wait()
-    await broadcast({"type": "done", "data": {}})
+    if engine_proc is not None:
+        await broadcast({"type": "done", "data": {}})
 
 async def demo_mode():
     """Emit synthetic snapshots when engine binary is absent (CI/demo)."""
@@ -158,29 +161,95 @@ async def startup():
 
 @app.on_event("shutdown")
 async def shutdown():
-    global engine_proc, engine_task
-    if engine_proc:
-        engine_proc.terminate()
-    if engine_task:
-        engine_task.cancel()
+    await stop_engine()
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "engine_pid": engine_proc.pid if engine_proc else None}
+    return {"status": "ok", "mode": engine_mode, "engine_pid": engine_proc.pid if engine_proc else None}
 
 @app.get("/snapshot")
 async def get_snapshot():
     return latest_snapshot
 
-@app.post("/restart")
-async def restart(cfg: dict = None):
-    global engine_proc, engine_task
+def merged_config(update: dict | None = None) -> dict:
+    cfg = ENGINE_DEFAULT | (update or {})
+    allowed = set(ENGINE_DEFAULT)
+    unknown = set((update or {})) - allowed
+    if unknown:
+        raise ValueError(f"unknown settings: {', '.join(sorted(unknown))}")
+    if (not isinstance(cfg["rate"], (int, float)) or cfg["rate"] <= 0 or
+        not isinstance(cfg["burst"], (int, float)) or cfg["burst"] <= 0 or
+        not isinstance(cfg["workers"], int) or cfg["workers"] < 1 or
+        not isinstance(cfg["symbols"], int) or not 1 <= cfg["symbols"] <= 20 or
+        not isinstance(cfg["high_water"], int) or not isinstance(cfg["low_water"], int) or
+        cfg["low_water"] >= cfg["high_water"] or
+        cfg["sync"] not in {"locked", "lockfree"} or
+        cfg["policy"] not in {"priority", "sjf", "rr", "adaptive"}):
+        raise ValueError("invalid simulation configuration")
+    return cfg
+
+async def stop_engine():
+    global engine_proc, engine_task, engine_mode
     if engine_proc:
-        engine_proc.terminate()
+        if engine_proc.returncode is None:
+            engine_proc.terminate()
+            try:
+                await asyncio.wait_for(engine_proc.wait(), timeout=3)
+            except asyncio.TimeoutError:
+                engine_proc.kill()
+                await engine_proc.wait()
+        engine_proc = None
     if engine_task:
         engine_task.cancel()
-    engine_task = asyncio.create_task(run_engine(cfg or ENGINE_DEFAULT))
-    return {"status": "restarted"}
+        try:
+            await engine_task
+        except asyncio.CancelledError:
+            pass
+        engine_task = None
+    engine_mode = "stopped"
+    await broadcast({"type": "mode", "data": {"mode": engine_mode}})
+
+async def start_engine(cfg: dict | None = None):
+    global engine_task, engine_config
+    async with engine_lock:
+        engine_config = merged_config(cfg or engine_config)
+        await stop_engine()
+        engine_task = asyncio.create_task(run_engine(engine_config))
+    return {"status": "started", "config": engine_config}
+
+@app.get("/config")
+async def get_config():
+    return engine_config
+
+@app.put("/config")
+async def set_config(cfg: dict):
+    global engine_config
+    try:
+        engine_config = merged_config(engine_config | cfg)
+    except ValueError as exc:
+        return {"status": "error", "detail": str(exc)}
+    return {"status": "saved", "config": engine_config}
+
+@app.post("/start")
+async def start(cfg: dict | None = None):
+    try:
+        return await start_engine(cfg)
+    except ValueError as exc:
+        return {"status": "error", "detail": str(exc)}
+
+@app.post("/stop")
+async def stop():
+    async with engine_lock:
+        await stop_engine()
+    return {"status": "stopped"}
+
+@app.post("/reset")
+async def reset():
+    return await start_engine(ENGINE_DEFAULT)
+
+@app.post("/restart")
+async def restart(cfg: dict = None):
+    return await start_engine(cfg)
 
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):

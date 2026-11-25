@@ -68,7 +68,13 @@ std::vector<SymbolBook::Level> SymbolBook::bid_levels(int n) const {
 std::vector<SymbolBook::Level> SymbolBook::ask_levels(int n) const {
     std::vector<Level> out;
     for (auto it = asks_.begin(); it != asks_.end() && static_cast<int>(out.size()) < n; ++it) {
-        out.push_back({it->first, 0, it->second.size()});
+        uint32_t total = 0;
+        auto orders = it->second;
+        while (!orders.empty()) {
+            total += orders.front().quantity;
+            orders.pop();
+        }
+        out.push_back({it->first, total, it->second.size()});
     }
     return out;
 }

@@ -17,8 +17,8 @@ experiments/  YAML run configurations and batch runner
 The selectable `--sync` mode applies to the generator-to-scheduler ingress
 channel. `locked` uses a mutex queue; `lockfree` uses a bounded C++ atomic
 queue. Policy scheduler queues and per-symbol order books remain mutex
-protected. The WAL currently measures priority/flush timing with a no-op sink;
-it does not persist records to disk.
+protected. The WAL appends JSON-line records to `adaptivex.wal`, calls `fsync`
+at each flush boundary, and drains pending records during shutdown.
 
 ## Requirements
 
@@ -93,8 +93,26 @@ Open the Vite URL shown in the terminal (normally
 `http://localhost:5173`). The dashboard connects to
 `ws://localhost:8000/ws`. If the engine binary is missing, the server emits
 synthetic demo metrics instead; build the engine to see real engine output.
-The order-book panel is illustrative and is not currently streamed by the
-engine.
+The dashboard now has Overview, Performance, Fairness, Engine Internals, and
+Order Book tabs. Order Book receives real aggregated bid/ask levels from the
+C++ engine rather than generated sample data. Overview and Performance expose
+validated controls for rate, burst rate, workers, symbols, synchronization,
+policy, and watermarks, with Start, Stop, and Reset actions.
+
+## API controls
+
+```text
+GET  /config       Current engine configuration
+PUT  /config       Validate and save a configuration
+POST /start        Start/restart with an optional configuration body
+POST /stop         Stop the current run
+POST /reset        Restore defaults and start a fresh run
+POST /restart      Compatibility alias for /start
+```
+
+Snapshots include p50/p90/p95/p99 latency, the actual cumulative WAL flush
+count (`wal_flushes`), and a `book` object with a selected symbol plus top-five
+bid and ask levels.
 
 ## Experiments
 

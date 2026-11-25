@@ -9,13 +9,19 @@
 #include <mutex>
 
 // Single-symbol order book with price-time priority matching.
-class SymbolBook {
+class SymbolBook
+{
 public:
     // Returns list of fills produced.
     std::vector<Fill> add(Order order);
 
     // Snapshot for display: top N levels each side.
-    struct Level { double price; uint32_t total_qty; size_t order_count; };
+    struct Level
+    {
+        double price;
+        uint32_t total_qty;
+        size_t order_count;
+    };
     std::vector<Level> bid_levels(int n = 5) const;
     std::vector<Level> ask_levels(int n = 5) const;
 
@@ -32,26 +38,28 @@ private:
 };
 
 // Multi-symbol book with per-symbol mutex.
-class OrderBook {
+class OrderBook
+{
 public:
     // Returns fills; thread-safe per symbol.
     std::vector<Fill> match(Order order);
 
     // Snapshot
-    SymbolBook::Level best_bid(const std::string& sym) const;
-    SymbolBook::Level best_ask(const std::string& sym) const;
-    std::vector<SymbolBook::Level> bid_levels(const std::string& sym, int n=5) const;
-    std::vector<SymbolBook::Level> ask_levels(const std::string& sym, int n=5) const;
+    SymbolBook::Level best_bid(const std::string &sym) const;
+    SymbolBook::Level best_ask(const std::string &sym) const;
+    std::vector<SymbolBook::Level> bid_levels(const std::string &sym, int n = 5) const;
+    std::vector<SymbolBook::Level> ask_levels(const std::string &sym, int n = 5) const;
 
     std::vector<std::string> active_symbols() const;
 
 private:
-    struct BookEntry {
+    struct BookEntry
+    {
         mutable std::mutex mu;
         SymbolBook book;
     };
     mutable std::mutex registry_mu_;
     std::unordered_map<std::string, std::unique_ptr<BookEntry>> books_;
 
-    BookEntry& get_or_create(const std::string& sym);
+    BookEntry &get_or_create(const std::string &sym);
 };

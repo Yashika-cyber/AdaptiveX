@@ -9,6 +9,7 @@ export default function WALMetrics({ snapshot }) {
   return (
     <div className="panel">
       <div className="panel-label">Write-Ahead Log</div>
+      <p className="card-description">Durable log timing and flushes. Critical fill records are flushed before routine arrivals.</p>
       <div className="wal-stats">
         <div className="wal-row">
           <span className="wal-lbl">critical lat.</span>
@@ -28,7 +29,7 @@ export default function WALMetrics({ snapshot }) {
         </div>
         <div className="wal-row">
           <span className="wal-lbl">flush count</span>
-          <span className="wal-val">{(snapshot?.t ?? 0) * 6}/s est.</span>
+          <span className="wal-val">{snapshot?.wal_flushes ?? 0}</span>
         </div>
       </div>
 

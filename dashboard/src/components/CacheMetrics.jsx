@@ -6,6 +6,7 @@ export default function CacheMetrics({ snapshot }) {
   return (
     <div className="panel">
       <div className="panel-label">Cache Comparison</div>
+      <p className="card-description">Hit rate for the predictive cache compared with the LRU baseline.</p>
       <div className="cache-compare">
         <div>
           <div className="cache-row-label">

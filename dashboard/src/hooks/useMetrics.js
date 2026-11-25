@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws'
+const API_URL = import.meta.env.VITE_API_URL || WS_URL.replace(/^ws/, 'http').replace(/\/ws$/, '')
 const HISTORY_LEN = 90  // seconds of history to keep
 
 export function useMetrics() {
   const [snapshot, setSnapshot] = useState(null)
   const [history,  setHistory]  = useState({ p50: [], p99: [], tput: [], t: [] })
   const [status,   setStatus]   = useState('connecting')  // connecting | live | demo | error
+  const [config,   setConfig]   = useState(null)
   const wsRef = useRef(null)
   const retryRef = useRef(null)
 
@@ -49,6 +51,7 @@ export function useMetrics() {
   }, [])
 
   useEffect(() => {
+    fetch(`${API_URL}/config`).then(r => r.ok ? r.json() : null).then(setConfig).catch(() => {})
     const connectTimer = setTimeout(connect, 0)
     return () => {
       clearTimeout(connectTimer)
@@ -64,5 +67,16 @@ export function useMetrics() {
     }
   }, [connect])
 
-  return { snapshot, history, status }
+  const request = useCallback(async (path, options = {}) => {
+    const response = await fetch(`${API_URL}${path}`, { headers: { 'Content-Type': 'application/json' }, ...options })
+    const data = await response.json()
+    if (!response.ok || data.status === 'error') throw new Error(data.detail || 'Request failed')
+    if (data.config) setConfig(data.config)
+    return data
+  }, [])
+  const saveConfig = useCallback(next => request('/config', { method: 'PUT', body: JSON.stringify(next) }), [request])
+  const start = useCallback(next => request('/start', { method: 'POST', body: JSON.stringify(next || config || {}) }), [request, config])
+  const stop = useCallback(() => request('/stop', { method: 'POST' }), [request])
+  const reset = useCallback(() => request('/reset', { method: 'POST' }), [request])
+  return { snapshot, history, status, config, saveConfig, start, stop, reset }
 }

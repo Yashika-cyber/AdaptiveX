@@ -33,6 +33,7 @@ export default function LatencyChart({ snapshot, history }) {
   return (
     <div className="panel">
       <div className="panel-label">Latency</div>
+      <p className="card-description">Queue-to-completion time. p50 is typical latency; p99 highlights slow tail behaviour.</p>
       <div style={{ height: 200 }}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>

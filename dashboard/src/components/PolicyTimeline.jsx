@@ -54,6 +54,7 @@ export default function PolicyTimeline({ snapshot }) {
           ))}
         </div>
       </div>
+      <p className="card-description">Tracks which scheduling policy processed the queue over the recent run.</p>
 
       <div className="timeline-track">
         {segments.map((seg, i) => (

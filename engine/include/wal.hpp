@@ -10,6 +10,7 @@
 #include <functional>
 #include <cstdint>
 #include <vector>
+#include <optional>
 
 enum class LogPriority : uint8_t { CRITICAL = 0, ROUTINE = 1 };
 
@@ -22,6 +23,7 @@ struct LogRecord {
 struct WALConfig {
     int    batch_ms     = 10;   // routine flush interval
     size_t batch_max    = 256;  // max routine records per flush
+    std::string path     = "adaptivex.wal";
     std::function<void(const std::vector<LogRecord>&)> flush_fn = nullptr;
 };
 
@@ -47,6 +49,10 @@ public:
     };
     Stats stats() const;
 
+    // Read durable records written by a previous process. Malformed trailing
+    // lines (for example after an interrupted write) are ignored.
+    static std::vector<std::string> recover(const std::string& path);
+
     void stop();
 
 private:
@@ -71,4 +77,5 @@ private:
 
     std::thread worker_;
     void run();
+    void flush_batch(const std::vector<LogRecord>& batch, bool critical);
 };

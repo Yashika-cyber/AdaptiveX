@@ -18,9 +18,9 @@ void LatencyHistogram::record(int64_t latency_us) {
     }
 }
 
-std::pair<int64_t, int64_t> LatencyHistogram::compute() const {
+std::array<int64_t, 4> LatencyHistogram::compute() const {
     std::lock_guard<std::mutex> lock(mu_);
-    if (values_.empty()) return {0, 0};
+    if (values_.empty()) return {0, 0, 0, 0};
     std::vector<int64_t> sorted(values_);
     std::sort(sorted.begin(), sorted.end());
     const auto percentile = [&sorted](double fraction) {
@@ -28,7 +28,7 @@ std::pair<int64_t, int64_t> LatencyHistogram::compute() const {
             fraction * static_cast<double>(sorted.size() - 1));
         return sorted[index];
     };
-    return {percentile(0.50), percentile(0.99)};
+    return {percentile(0.50), percentile(0.90), percentile(0.95), percentile(0.99)};
 }
 
 double ThroughputCounter::take(double seconds) {
@@ -54,6 +54,8 @@ std::string to_json(const MetricsSnapshot& s) {
       << "\"policy\":\""   << s.policy       << "\","
       << "\"burst\":"      << (s.in_burst ? "true" : "false") << ","
       << "\"p50_us\":"     << s.p50_us       << ","
+      << "\"p90_us\":"     << s.p90_us       << ","
+      << "\"p95_us\":"     << s.p95_us       << ","
       << "\"p99_us\":"     << s.p99_us       << ","
       << "\"tput\":"       << std::setprecision(1) << s.throughput << ","
       << "\"fairness\":"   << std::setprecision(4) << s.fairness   << ","
@@ -66,8 +68,20 @@ std::string to_json(const MetricsSnapshot& s) {
       << "\"wal_crit_ms\":" << std::setprecision(3) << s.wal_crit_lat_ms << ","
       << "\"wal_rout_ms\":" << s.wal_rout_lat_ms    << ","
       << "\"wal_lift\":"   << std::setprecision(2)  << s.wal_lift  << ","
+      << "\"wal_flushes\":" << s.wal_flush_count << ","
       << "\"switches\":"   << s.policy_switches      << ","
-      << "\"q_len\":"      << s.queue_len
+      << "\"q_len\":"      << s.queue_len << ","
+      << "\"book\":{\"symbol\":\"" << s.book_symbol << "\",\"bids\":[";
+    for (size_t i = 0; i < s.bids.size(); ++i) {
+        if (i) o << ',';
+        o << "[" << std::setprecision(2) << s.bids[i].price << ',' << s.bids[i].quantity << "]";
+    }
+    o << "],\"asks\":[";
+    for (size_t i = 0; i < s.asks.size(); ++i) {
+        if (i) o << ',';
+        o << "[" << std::setprecision(2) << s.asks[i].price << ',' << s.asks[i].quantity << "]";
+    }
+    o << "]}"
       << "}";
     return o.str();
 }

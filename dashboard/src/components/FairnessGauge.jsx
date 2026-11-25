@@ -16,6 +16,7 @@ export default function FairnessGauge({ snapshot }) {
   return (
     <div className="panel">
       <div className="panel-label">Fairness Index (Jain&apos;s)</div>
+      <p className="card-description">Shows how evenly completed work is shared across trader types; 1.0 is perfectly balanced.</p>
 
       <div className="fair-index" style={{ color: fairColor(j) }}>
         {j.toFixed(3)}

@@ -28,6 +28,12 @@ body { font-family: var(--font-sans); font-size: 14px; overflow-x: hidden; }
 
 /* ── App shell ─────────────────────────────────────────────── */
 .app { display: flex; flex-direction: column; min-height: 100vh; }
+.tab-bar { display: flex; gap: 4px; padding: 12px 16px 0; overflow-x: auto; border-bottom: 1px solid var(--border); }
+.tab-bar button, .control-actions button { border: 1px solid transparent; background: transparent; color: var(--text-secondary); font: 500 11px var(--font-mono); padding: 10px 12px; cursor: pointer; white-space: nowrap; }
+.tab-bar button.active { color: var(--blue); border-bottom-color: var(--blue); background: rgba(59,130,246,.07); }
+.dashboard-content { max-width: 1440px; width: 100%; margin: 0 auto; }
+.page-description { color: var(--text-secondary); font-size: 13px; padding: 14px 16px 0; }
+.page-description span { color: var(--text-muted); font: 10px var(--font-mono); margin-left: 10px; }
 
 /* ── Burst banner ──────────────────────────────────────────── */
 .burst-banner {
@@ -62,6 +68,19 @@ body { font-family: var(--font-sans); font-size: 14px; overflow-x: hidden; }
   margin: 12px;
   overflow: hidden;
 }
+.main-grid.two-columns { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; }
+.main-grid.single-column { display: flex; flex-direction: column; width: min(100% - 24px, 900px); grid-template-columns: none; grid-template-rows: none; margin-right: auto; background: var(--border); }
+.control-panel { margin: 0 12px 16px; border: 1px solid var(--border); border-radius: 6px; }
+.control-grid { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 12px; }
+.control-grid label { color: var(--text-muted); font: 9px var(--font-mono); letter-spacing: .6px; text-transform: uppercase; }
+.control-grid input, .control-grid select { display: block; width: 100%; margin-top: 5px; background: var(--bg-base); border: 1px solid var(--border); border-radius: 3px; color: var(--text-primary); padding: 7px; font: 12px var(--font-mono); }
+.control-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.control-actions button { border-color: var(--border); padding: 7px 10px; }
+.control-actions button.primary { background: var(--blue); color: #fff; border-color: var(--blue); }
+.control-actions button.quiet { color: var(--text-muted); }
+.control-actions button:disabled { opacity: .5; cursor: not-allowed; }
+.control-message { color: var(--green); font: 10px var(--font-mono); margin-left: 6px; }
+.empty-state { color: var(--text-muted); font: 12px var(--font-mono); padding: 30px 0; text-align: center; }
 
 /* Full-width rows */
 .panel-timeline { grid-column: 1 / -1; }
@@ -82,6 +101,7 @@ body { font-family: var(--font-sans); font-size: 14px; overflow-x: hidden; }
   color: var(--text-muted);
   margin-bottom: 10px;
 }
+.card-description { color: var(--text-secondary); font-size: 11px; line-height: 1.45; margin: -3px 0 12px; max-width: 680px; }
 
 /* ── Throughput card ───────────────────────────────────────── */
 .tput-value {
@@ -162,4 +182,6 @@ body { font-family: var(--font-sans); font-size: 14px; overflow-x: hidden; }
   .main-grid { grid-template-columns: 1fr 1fr; }
   .panel-timeline { grid-column: 1 / -1; }
   .panel-bottom { grid-template-columns: 1fr; }
+  .main-grid.two-columns, .main-grid.single-column { grid-template-columns: 1fr; }
+  .control-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

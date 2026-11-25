@@ -45,11 +45,16 @@ void LRUCache::reset_stats() {
 PredictiveCache::PredictiveCache(size_t cap, int k, double alpha)
     : cap_(cap), k_(k), alpha_(alpha) {}
 
-bool PredictiveCache::access(const std::string& sym) {
+bool PredictiveCache::lookup(const std::string& sym) {
     std::lock_guard<std::mutex> lk(mu_);
     total_++;
     bool hit = active_.count(sym) > 0;
     if (hit) hits_++;
+    return hit;
+}
+
+void PredictiveCache::observe(const std::string& sym) {
+    std::lock_guard<std::mutex> lk(mu_);
 
     // Update frequency EWMA
     update_freq(sym);
@@ -72,8 +77,6 @@ bool PredictiveCache::access(const std::string& sym) {
             }
         }
     }
-
-    return hit;
 }
 
 void PredictiveCache::update_freq(const std::string& sym) {

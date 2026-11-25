@@ -19,6 +19,7 @@
 #include <cstdlib>
 #include <vector>
 #include <string>
+#include <algorithm>
 
 #include "order.hpp"
 #include "generator.hpp"
@@ -137,12 +138,10 @@ int main(int argc, char* argv[]) {
 
             // Cache lookup
             std::string sym(o.symbol);
-            bool phit = pred_cache.access(sym);
-            lru_cache.access(sym);
-            if (!phit) {
-                pred_cache.access(sym);  // insert on miss
-                lru_cache.insert(sym);
-            }
+            pred_cache.lookup(sym);
+            bool lru_hit = lru_cache.access(sym);
+            pred_cache.observe(sym);
+            if (!lru_hit) lru_cache.insert(sym);
 
             // Order book matching
             auto fills = book.match(o);
@@ -228,7 +227,7 @@ int main(int argc, char* argv[]) {
         if (cfg.adaptive) ctrl.tick(qlen);
 
         // Gather metrics
-        auto [p50, p99] = latency_hist.compute();
+        auto [p50, p90, p95, p99] = latency_hist.compute();
         fairness.set_median_wait_us(p50);
         double through = tput.take(1.0);
         auto fair = fairness.compute();
@@ -239,6 +238,8 @@ int main(int argc, char* argv[]) {
         snap.policy       = policy_name(ctrl.current_policy());
         snap.in_burst     = gen.in_burst();
         snap.p50_us       = p50;
+        snap.p90_us       = p90;
+        snap.p95_us       = p95;
         snap.p99_us       = p99;
         snap.throughput   = through;
         snap.fairness     = fair.jain_index;
@@ -250,8 +251,18 @@ int main(int argc, char* argv[]) {
         snap.wal_crit_lat_ms = ws.avg_critical_latency_ms;
         snap.wal_rout_lat_ms = ws.avg_routine_latency_ms;
         snap.wal_lift        = ws.priority_lift;
+        snap.wal_flush_count = ws.flush_count;
         snap.policy_switches = ctrl.switch_count();
         snap.queue_len       = qlen;
+        auto symbols = book.active_symbols();
+        if (!symbols.empty()) {
+            std::sort(symbols.begin(), symbols.end());
+            snap.book_symbol = symbols.front();
+            for (const auto& level : book.bid_levels(snap.book_symbol))
+                snap.bids.push_back({level.price, level.total_qty});
+            for (const auto& level : book.ask_levels(snap.book_symbol))
+                snap.asks.push_back({level.price, level.total_qty});
+        }
 
         print_json(snap);
     }

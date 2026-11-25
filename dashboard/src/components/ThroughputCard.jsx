@@ -23,6 +23,7 @@ export default function ThroughputCard({ snapshot }) {
   return (
     <div className="panel">
       <div className="panel-label">Throughput</div>
+      <p className="card-description">Completed orders per second; use it to compare engine capacity between runs.</p>
       <div className="tput-value">{tput.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>
       <div className="tput-unit">orders / sec</div>
 

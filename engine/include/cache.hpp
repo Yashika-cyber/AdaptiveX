@@ -26,7 +26,11 @@ private:
 class PredictiveCache {
 public:
     explicit PredictiveCache(size_t capacity, int prefetch_count, double alpha = 0.2);
-    bool access(const std::string& symbol);
+    // An access is deliberately split into these phases. lookup() is the only
+    // operation that contributes to hit-rate statistics; observe() learns and
+    // admits the requested symbol, then prefetches likely successors.
+    bool lookup(const std::string& symbol);
+    void observe(const std::string& symbol);
     double hit_rate() const;
     void reset_stats();
 

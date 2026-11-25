@@ -2,10 +2,14 @@
 #include <thread>
 #include <chrono>
 #include <cstdio>
+#include <utility>
+#include <fstream>
+#include <fcntl.h>
+#include <unistd.h>
 
 WAL::WAL(const WALConfig& cfg) : cfg_(cfg) {
     if (!cfg_.flush_fn)
-        cfg_.flush_fn = [](const std::vector<LogRecord>&) {};  // no-op
+        cfg_.flush_fn = [](const std::vector<LogRecord>&) {};
     worker_ = std::thread([this] { run(); });
 }
 
@@ -26,11 +30,42 @@ void WAL::write(LogRecord rec) {
     }
 }
 
+void WAL::flush_batch(const std::vector<LogRecord>& batch, bool critical) {
+    if (batch.empty()) return;
+    // A single worker owns the file, preserving record order and avoiding
+    // interleaved writes. Append-only JSON lines make recovery straightforward.
+    std::string bytes;
+    for (const auto& rec : batch) {
+        bytes += rec.payload;
+        bytes += '\n';
+    }
+    const int fd = ::open(cfg_.path.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
+    bool persisted = false;
+    if (fd >= 0) {
+        size_t written = 0;
+        while (written < bytes.size()) {
+            const ssize_t n = ::write(fd, bytes.data() + written, bytes.size() - written);
+            if (n <= 0) break;
+            written += static_cast<size_t>(n);
+        }
+        persisted = written == bytes.size() && ::fsync(fd) == 0;
+        ::close(fd);
+    }
+    cfg_.flush_fn(batch);
+    if (persisted) flush_count_.fetch_add(1, std::memory_order_relaxed);
+
+    const auto now = std::chrono::steady_clock::now();
+    for (const auto& rec : batch) {
+        const auto micros = std::chrono::duration_cast<std::chrono::microseconds>(now - rec.enqueue_time).count();
+        (critical ? crit_lat_sum_ : rout_lat_sum_).fetch_add(micros, std::memory_order_relaxed);
+    }
+}
+
 void WAL::run() {
     auto next_batch = std::chrono::steady_clock::now()
                     + std::chrono::milliseconds(cfg_.batch_ms);
 
-    while (running_.load(std::memory_order_acquire)) {
+    while (true) {
         // ── Flush critical queue immediately ──────────────────
         {
             std::unique_lock<std::mutex> lk(crit_mu_);
@@ -42,20 +77,14 @@ void WAL::run() {
                 crit_q_.pop();
                 lk.unlock();
 
-                auto lat = std::chrono::steady_clock::now() - rec.enqueue_time;
-                crit_lat_sum_.fetch_add(
-                    std::chrono::duration_cast<std::chrono::microseconds>(lat).count(),
-                    std::memory_order_relaxed);
-
-                cfg_.flush_fn({rec});
-                flush_count_.fetch_add(1, std::memory_order_relaxed);
+                flush_batch({rec}, true);
                 lk.lock();
             }
         }
 
         // ── Flush routine queue on timer ───────────────────────
         auto now = std::chrono::steady_clock::now();
-        if (now >= next_batch) {
+        if (now >= next_batch || !running_.load(std::memory_order_acquire)) {
             next_batch = now + std::chrono::milliseconds(cfg_.batch_ms);
 
             std::vector<LogRecord> batch;
@@ -68,17 +97,25 @@ void WAL::run() {
             }
 
             if (!batch.empty()) {
-                for (auto& rec : batch) {
-                    auto lat = std::chrono::steady_clock::now() - rec.enqueue_time;
-                    rout_lat_sum_.fetch_add(
-                        std::chrono::duration_cast<std::chrono::microseconds>(lat).count(),
-                        std::memory_order_relaxed);
-                }
-                cfg_.flush_fn(batch);
-                flush_count_.fetch_add(1, std::memory_order_relaxed);
+                flush_batch(batch, false);
             }
         }
+        if (!running_.load(std::memory_order_acquire)) {
+            std::lock_guard<std::mutex> crit_lk(crit_mu_);
+            std::lock_guard<std::mutex> rout_lk(rout_mu_);
+            if (crit_q_.empty() && rout_q_.empty()) break;
+        }
     }
+}
+
+std::vector<std::string> WAL::recover(const std::string& path) {
+    std::ifstream in(path);
+    std::vector<std::string> records;
+    std::string line;
+    while (std::getline(in, line)) {
+        if (!line.empty() && line.front() == '{' && line.back() == '}') records.push_back(line);
+    }
+    return records;
 }
 
 void WAL::stop() {
