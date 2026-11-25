@@ -12,6 +12,7 @@ import ControlPanel from './components/ControlPanel'
 import WorkerHeatmap from './components/WorkerHeatmap'
 import RunComparison from './components/RunComparison'
 import InsightsPanel from './components/InsightsPanel'
+import ExperimentLab from './components/ExperimentLab'
 import './index.css'
 
 export default function App() {
@@ -40,16 +41,17 @@ export default function App() {
         <div className="burst-banner">⚠ BURST MODE ACTIVE</div>
       )}
 
-      <nav className="tab-bar">{[['overview','01. Overview'],['performance','02. Performance'],['fairness','03. Fairness'],['internals','04. Engine internals'],['book','05. Order book'],['compare','06. Compare']].map(([id, label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>{label}</button>)}</nav>
+      <nav className="tab-bar">{[['overview','01. Overview'],['performance','02. Performance'],['fairness','03. Fairness'],['internals','04. Engine internals'],['book','05. Order book'],['compare','06. Compare'],['lab','07. Experiment Lab']].map(([id, label]) => <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>{label}</button>)}</nav>
       <main className="dashboard-content">
-        <p className="page-description">{tab === 'overview' ? 'Live system health, policy activity and key matching metrics.' : tab === 'performance' ? 'Latency percentiles, throughput and queue behaviour, including per-worker activity.' : tab === 'fairness' ? 'Jain’s index, trader service ratios and starvation.' : tab === 'internals' ? 'Predictive cache, LRU and durable WAL metrics.' : tab === 'book' ? 'Aggregated bid and ask depth streamed from the engine.' : 'Compare measured throughput and p99 latency across policies and synchronization modes.'}<span>{age === null ? 'Waiting for first snapshot' : `Updated ${age}s ago`}</span></p>
+        <p className="page-description">{tab === 'overview' ? 'Live system health, policy activity and key matching metrics.' : tab === 'performance' ? 'Latency percentiles, throughput and queue behaviour, including per-worker activity.' : tab === 'fairness' ? 'Jain’s index, trader service ratios and starvation.' : tab === 'internals' ? 'Predictive cache, LRU and durable WAL metrics.' : tab === 'book' ? 'Aggregated bid and ask depth streamed from the engine.' : tab === 'compare' ? 'Compare measured throughput and p99 latency across policies and synchronization modes.' : 'Run repeatable benchmark suites, review historical summaries, and export CSV reports.'}<span>{age === null ? 'Waiting for first snapshot' : `Updated ${age}s ago`}</span></p>
         {!snapshot ? <div className="page-state">{status === 'error' ? 'Connection error — retrying…' : 'Waiting for engine metrics…'}</div> : <>
         {tab === 'overview' && <><div className="main-grid"><ThroughputCard snapshot={snapshot}/><LatencyChart snapshot={snapshot} history={history}/><FairnessGauge snapshot={snapshot}/><PolicyTimeline snapshot={snapshot}/></div>{control}</>}
         {tab === 'performance' && <><div className="main-grid two-columns"><LatencyChart snapshot={snapshot} history={history}/><ThroughputCard snapshot={snapshot}/><WorkerHeatmap snapshot={snapshot}/><PolicyTimeline snapshot={snapshot}/></div>{control}</>}
-        {tab === 'fairness' && <div className="main-grid single-column"><InsightsPanel snapshot={snapshot} type="fairness"/><FairnessGauge snapshot={snapshot}/><PolicyTimeline snapshot={snapshot}/></div>}
+        {tab === 'fairness' && <div className="main-grid single-column"><InsightsPanel snapshot={snapshot} type="fairness"/><FairnessGauge snapshot={snapshot} history={history}/><PolicyTimeline snapshot={snapshot}/></div>}
         {tab === 'internals' && <div className="main-grid two-columns"><InsightsPanel snapshot={snapshot} type="internals"/><CacheMetrics snapshot={snapshot}/><WALMetrics snapshot={snapshot}/></div>}
         {tab === 'book' && <div className="main-grid single-column"><OrderBookViz snapshot={snapshot} config={metrics.config} onSymbolChange={setBookSymbol}/></div>}
         {tab === 'compare' && <div className="main-grid single-column"><RunComparison snapshot={snapshot} config={metrics.config} onRun={async sync => { try { await metrics.start({ ...(metrics.config || {}), sync }); notify(`${sync === 'locked' ? 'Mutex / Locked' : 'Lock-free'} run started`) } catch (error) { notify(error.message) } }}/></div>}
+        {tab === 'lab' && <ExperimentLab/>}
         </>}
       </main>
       {toast && <div className="toast" role="status">{toast}</div>}

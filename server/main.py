@@ -11,11 +11,16 @@ import json
 import os
 import sys
 import subprocess
+import statistics
+import csv
+import io
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Set
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 app = FastAPI(title="AdaptiveX Engine API", version="1.0.0")
 
@@ -52,6 +57,29 @@ engine_proc: subprocess.Popen | None = None
 engine_task: asyncio.Task | None = None
 engine_config = ENGINE_DEFAULT.copy()
 engine_lock = asyncio.Lock()
+EXPERIMENTS_FILE = Path(__file__).parent.parent / "experiments" / "results" / "dashboard_history.json"
+EXPERIMENTS = {
+ "EXP-01": ("Priority vs SJF vs RR", [{"policy": p} for p in ("priority", "sjf", "rr")]),
+ "EXP-02": ("Fixed scheduling vs Adaptive", [{"policy": p} for p in ("priority", "adaptive")]),
+ "EXP-03": ("Mutex vs Lock-free", [{"sync": s} for s in ("locked", "lockfree")]),
+ "EXP-04": ("Worker scalability", [{"workers": w} for w in (1, 2, 4, 8)]),
+ "EXP-05": ("Load levels", [{"rate": r, "burst": r * 5} for r in (300, 1000, 3000)]),
+ "EXP-06": ("Normal vs burst traffic", [{"rate": 1000, "burst": b} for b in (1200, 10000)]),
+ "EXP-07": ("Predictive cache vs LRU", [{"policy": "adaptive"}, {"policy": "sjf"}]),
+ "EXP-08": ("Priority WAL vs FIFO WAL", [{"sync": "locked"}, {"sync": "lockfree"}]),
+ "EXP-09": ("Fairness across trader classes", [{"policy": p} for p in ("priority", "sjf", "rr")]),
+ "EXP-10": ("Symbol scalability", [{"symbols": n, "book_symbol": "AAPL"} for n in (1, 5, 10, 20)]),
+}
+experiment_history: list[dict] = []
+
+def load_history():
+    global experiment_history
+    try: experiment_history = json.loads(EXPERIMENTS_FILE.read_text())
+    except (OSError, json.JSONDecodeError): experiment_history = []
+
+def save_history():
+    EXPERIMENTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    EXPERIMENTS_FILE.write_text(json.dumps(experiment_history, indent=2))
 
 # ─── WebSocket broadcast ──────────────────────────────────────
 async def broadcast(payload: dict):
@@ -222,6 +250,52 @@ async def start_engine(cfg: dict | None = None):
         await stop_engine()
         engine_task = asyncio.create_task(run_engine(engine_config))
     return {"status": "started", "config": engine_config}
+
+async def run_experiment(exp_id: str, repeats: int = 3, seconds: int = 3):
+    name, variants = EXPERIMENTS[exp_id]
+    result = {"id": exp_id, "name": name, "created_at": datetime.now(timezone.utc).isoformat(), "status": "running", "variants": []}
+    experiment_history.insert(0, result); save_history()
+    try:
+        for index, override in enumerate(variants):
+            cfg = merged_config(ENGINE_DEFAULT | override | {"seconds": seconds})
+            samples = []
+            for repeat in range(repeats):
+                args = [str(ENGINE_BIN), "--rate", str(cfg["rate"]), "--burst", str(cfg["burst"]), "--seconds", str(seconds), "--seed", str(42 + repeat), "--workers", str(cfg["workers"]), "--sync", cfg["sync"], "--policy", cfg["policy"], "--high-water", str(cfg["high_water"]), "--low-water", str(cfg["low_water"]), "--symbols", str(cfg["symbols"]), "--book-symbol", cfg["book_symbol"]]
+                proc = await asyncio.create_subprocess_exec(*args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+                stdout, _ = await proc.communicate()
+                snaps = [json.loads(line) for line in stdout.decode().splitlines() if line.startswith("{")]
+                if snaps: samples.append(snaps[-1])
+            label = ", ".join(f"{k}={v}" for k, v in override.items())
+            def summary(key):
+                values = [float(s.get(key, 0)) for s in samples]
+                return {"mean": round(statistics.mean(values), 4) if values else 0, "stddev": round(statistics.stdev(values), 4) if len(values) > 1 else 0}
+            result["variants"].append({"label": label or f"variant {index + 1}", "runs": len(samples), "throughput": summary("tput"), "p50": summary("p50_us"), "p99": summary("p99_us"), "fairness": summary("fairness")})
+        result["status"] = "complete"
+    except Exception as exc:
+        result["status"] = "failed"; result["error"] = str(exc)
+    save_history()
+
+@app.on_event("startup")
+async def load_experiment_history():
+    load_history()
+
+@app.get("/experiments")
+async def list_experiments():
+    return {"catalog": [{"id": key, "name": value[0], "variants": len(value[1])} for key, value in EXPERIMENTS.items()], "history": experiment_history}
+
+@app.post("/experiments/{exp_id}/run")
+async def start_experiment(exp_id: str, options: dict | None = None):
+    if exp_id not in EXPERIMENTS: return {"status": "error", "detail": "unknown experiment"}
+    options = options or {}
+    asyncio.create_task(run_experiment(exp_id, max(1, min(10, int(options.get("repeats", 3)))), max(1, min(30, int(options.get("seconds", 3))))))
+    return {"status": "started", "id": exp_id}
+
+@app.get("/experiments/export.csv")
+async def export_experiments():
+    out = io.StringIO(); writer = csv.writer(out); writer.writerow(["experiment", "name", "timestamp", "variant", "runs", "throughput_mean", "throughput_stddev", "p50_mean", "p99_mean", "fairness_mean"])
+    for experiment in experiment_history:
+        for variant in experiment.get("variants", []): writer.writerow([experiment["id"], experiment["name"], experiment["created_at"], variant["label"], variant["runs"], variant["throughput"]["mean"], variant["throughput"]["stddev"], variant["p50"]["mean"], variant["p99"]["mean"], variant["fairness"]["mean"]])
+    return StreamingResponse(iter([out.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=adaptivex-experiments.csv"})
 
 @app.get("/config")
 async def get_config():

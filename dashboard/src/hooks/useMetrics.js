@@ -6,7 +6,7 @@ const HISTORY_LEN = 90  // seconds of history to keep
 
 export function useMetrics() {
   const [snapshot, setSnapshot] = useState(null)
-  const [history,  setHistory]  = useState({ p50: [], p90: [], p95: [], p99: [], tput: [], t: [] })
+  const [history,  setHistory]  = useState({ p50: [], p90: [], p95: [], p99: [], tput: [], fairness: [], t: [] })
   const [status,   setStatus]   = useState('connecting')  // connecting | live | demo | error
   const [config,   setConfig]   = useState(null)
   const [updatedAt, setUpdatedAt] = useState(null)
@@ -41,6 +41,7 @@ export function useMetrics() {
                 p95:  push(h.p95,  d.p95_us),
                 p99:  push(h.p99,  d.p99_us),
                 tput: push(h.tput, d.tput),
+                fairness: push(h.fairness, d.fairness),
                 t:    push(h.t,    d.t),
               }
             })

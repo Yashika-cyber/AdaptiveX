@@ -4,6 +4,7 @@ const TRADERS = [
   { key: 'sr_mm',     label: 'Market Maker',  color: '#8B5CF6' },
 ]
 import MetricHelp from './MetricHelp'
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts'
 
 function fairColor(j) {
   if (j >= 0.9) return 'var(--green)'
@@ -11,7 +12,7 @@ function fairColor(j) {
   return 'var(--red)'
 }
 
-export default function FairnessGauge({ snapshot }) {
+export default function FairnessGauge({ snapshot, history }) {
   const j = snapshot?.fairness ?? 0
 
   return (
@@ -50,6 +51,8 @@ export default function FairnessGauge({ snapshot }) {
           ⚠ {snapshot.starved} orders waited &gt;10× median
         </div>
       )}
+      <div className="fairness-trend-label">FAIRNESS TREND — 1.0 = EQUAL SERVICE</div>
+      <div className="fairness-chart"><ResponsiveContainer><LineChart data={(history?.t || []).map((t, i) => ({ t, fairness: history.fairness[i] }))}><XAxis dataKey="t" hide/><YAxis domain={[0, 1.05]} width={30} tick={{fill:'#7BA3C4',fontSize:9}}/><Tooltip/><ReferenceLine y={1} stroke="rgba(16,185,129,.35)" strokeDasharray="3 3"/><Line dataKey="fairness" stroke="#10B981" strokeWidth={3} dot={false}/></LineChart></ResponsiveContainer></div>
     </div>
   )
 }
