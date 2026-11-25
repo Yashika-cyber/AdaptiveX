@@ -76,11 +76,24 @@ target_include_directories(test_sync_queue PRIVATE include)
 target_link_libraries(test_sync_queue Threads::Threads)
 target_compile_options(test_sync_queue PRIVATE -g -O0 -Wall)
 
+add_executable(test_cache tests/test_cache.cpp src/cache.cpp)
+target_include_directories(test_cache PRIVATE include)
+target_link_libraries(test_cache Threads::Threads)
+add_executable(test_wal tests/test_wal.cpp src/wal.cpp)
+target_include_directories(test_wal PRIVATE include)
+target_link_libraries(test_wal Threads::Threads)
+add_executable(test_controller tests/test_controller.cpp src/controller.cpp src/scheduler.cpp)
+target_include_directories(test_controller PRIVATE include)
+target_link_libraries(test_controller Threads::Threads)
+
 add_test(NAME scheduler COMMAND test_scheduler)
 add_test(NAME fairness COMMAND test_fairness)
 add_test(NAME generator COMMAND test_generator)
 add_test(NAME order_book COMMAND test_order_book)
 add_test(NAME sync_queue COMMAND test_sync_queue)
+add_test(NAME cache COMMAND test_cache)
+add_test(NAME wal COMMAND test_wal)
+add_test(NAME controller COMMAND test_controller)
 
 add_custom_target(run_tests
     COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure

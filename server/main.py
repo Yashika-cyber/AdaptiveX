@@ -43,7 +43,9 @@ ENGINE_DEFAULT = {
     "high_water": 500,
     "low_water": 100,
     "symbols": 20,
+    "book_symbol": "AAPL",
 }
+SYMBOL_POOL = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META", "NFLX", "AMD", "INTC", "ORCL", "CRM", "ADBE", "PYPL", "UBER", "LYFT", "SNAP", "TWTR", "RBLX", "COIN"]
 
 ENGINE_BIN = Path(__file__).parent.parent / "engine" / "build" / "adaptivex"
 engine_proc: subprocess.Popen | None = None
@@ -80,6 +82,7 @@ async def run_engine(engine_cfg: dict):
         "--high-water", str(engine_cfg.get("high_water", 500)),
         "--low-water",  str(engine_cfg.get("low_water", 100)),
         "--symbols",    str(engine_cfg.get("symbols", 20)),
+        "--book-symbol", engine_cfg.get("book_symbol", "AAPL"),
     ]
 
     try:
@@ -134,6 +137,8 @@ async def demo_mode():
             "policy": policies[policy_idx],
             "burst": random.random() < 0.08,
             "p50_us": int(350 + 150 * abs(math.sin(t * 0.07)) + random.gauss(0, 20)),
+            "p90_us": int(550 + 250 * abs(math.sin(t * 0.07)) + random.gauss(0, 30)),
+            "p95_us": int(620 + 320 * abs(math.sin(t * 0.07)) + random.gauss(0, 40)),
             "p99_us": int(700 + 400 * abs(math.sin(t * 0.07)) + random.gauss(0, 60)),
             "tput":   round(max(100, tput), 1),
             "fairness": round(0.85 + 0.1 * math.sin(t * 0.05) + random.gauss(0, 0.01), 4),
@@ -181,6 +186,7 @@ def merged_config(update: dict | None = None) -> dict:
         not isinstance(cfg["burst"], (int, float)) or cfg["burst"] <= 0 or
         not isinstance(cfg["workers"], int) or cfg["workers"] < 1 or
         not isinstance(cfg["symbols"], int) or not 1 <= cfg["symbols"] <= 20 or
+        not isinstance(cfg["book_symbol"], str) or cfg["book_symbol"] not in SYMBOL_POOL[:cfg["symbols"]] or
         not isinstance(cfg["high_water"], int) or not isinstance(cfg["low_water"], int) or
         cfg["low_water"] >= cfg["high_water"] or
         cfg["sync"] not in {"locked", "lockfree"} or

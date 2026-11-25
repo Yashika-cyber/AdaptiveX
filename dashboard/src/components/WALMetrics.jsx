@@ -1,3 +1,5 @@
+import MetricHelp from './MetricHelp'
+
 export default function WALMetrics({ snapshot }) {
   const critMs = snapshot?.wal_crit_ms ?? 0
   const routMs = snapshot?.wal_rout_ms ?? 0
@@ -8,7 +10,7 @@ export default function WALMetrics({ snapshot }) {
 
   return (
     <div className="panel">
-      <div className="panel-label">Write-Ahead Log</div>
+      <div className="panel-label">Write-Ahead Log <MetricHelp text="Records are persisted before processing is acknowledged, supporting recovery after a failure." /></div>
       <p className="card-description">Durable log timing and flushes. Critical fill records are flushed before routine arrivals.</p>
       <div className="wal-stats">
         <div className="wal-row">

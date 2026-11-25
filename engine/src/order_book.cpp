@@ -38,6 +38,7 @@ std::vector<Fill> SymbolBook::try_match() {
 
         bid.quantity -= fill_qty;
         ask.quantity -= fill_qty;
+        f.partial = bid.quantity > 0 || ask.quantity > 0;
 
         if (bid.quantity == 0) {
             bid_q.pop();

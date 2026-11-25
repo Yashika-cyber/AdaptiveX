@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import MetricHelp from './MetricHelp'
 
 const MAX_HISTORY = 60  // seconds to show
 
@@ -42,7 +43,7 @@ export default function PolicyTimeline({ snapshot }) {
   return (
     <div className="panel panel-timeline">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <div className="panel-label" style={{ marginBottom: 0 }}>Policy Timeline — last {total}s</div>
+        <div className="panel-label" style={{ marginBottom: 0 }}>Policy Timeline — last {total}s <MetricHelp text="Shows the active scheduling policy over time. Adaptive mode can switch policy as queue pressure changes." /></div>
         <div style={{ display: 'flex', gap: 16 }}>
           {Object.entries(counts).filter(([,v]) => v > 0).map(([p, v]) => (
             <span key={p} style={{

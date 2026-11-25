@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from 'react'
+import MetricHelp from './MetricHelp'
 
 export default function ThroughputCard({ snapshot }) {
   const prevRef = useRef(null)
@@ -22,7 +23,7 @@ export default function ThroughputCard({ snapshot }) {
 
   return (
     <div className="panel">
-      <div className="panel-label">Throughput</div>
+      <div className="panel-label">Throughput <MetricHelp text="Number of orders completed by the matching engine each second." /></div>
       <p className="card-description">Completed orders per second; use it to compare engine capacity between runs.</p>
       <div className="tput-value">{tput.toLocaleString('en-US', { maximumFractionDigits: 0 })}</div>
       <div className="tput-unit">orders / sec</div>
@@ -54,6 +55,10 @@ export default function ThroughputCard({ snapshot }) {
           <span className="lbl">starved</span>
           <span className="val" style={{ color: starvedColor }}>{starved}</span>
         </div>
+        <div className="mini-stat"><span className="lbl">avg queue wait</span><span className="val">{(snapshot?.wait_avg_us ?? 0).toFixed(0)} µs</span></div>
+        <div className="mini-stat"><span className="lbl">max queue wait</span><span className="val">{snapshot?.wait_max_us ?? 0} µs</span></div>
+        <div className="mini-stat"><span className="lbl">CPU usage</span><span className="val">{(snapshot?.cpu_pct ?? 0).toFixed(1)}%</span></div>
+        <div className="mini-stat"><span className="lbl">mutex waits</span><span className="val">{snapshot?.lock_contentions ?? 0} · {(snapshot?.lock_wait_us ?? 0).toFixed(1)}µs</span></div>
       </div>
     </div>
   )

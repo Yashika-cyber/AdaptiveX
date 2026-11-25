@@ -18,9 +18,9 @@ void LatencyHistogram::record(int64_t latency_us) {
     }
 }
 
-std::array<int64_t, 4> LatencyHistogram::compute() const {
+std::array<int64_t, 6> LatencyHistogram::compute() const {
     std::lock_guard<std::mutex> lock(mu_);
-    if (values_.empty()) return {0, 0, 0, 0};
+    if (values_.empty()) return {0, 0, 0, 0, 0, 0};
     std::vector<int64_t> sorted(values_);
     std::sort(sorted.begin(), sorted.end());
     const auto percentile = [&sorted](double fraction) {
@@ -28,7 +28,8 @@ std::array<int64_t, 4> LatencyHistogram::compute() const {
             fraction * static_cast<double>(sorted.size() - 1));
         return sorted[index];
     };
-    return {percentile(0.50), percentile(0.90), percentile(0.95), percentile(0.99)};
+    int64_t sum = 0; for (auto value : sorted) sum += value;
+    return {percentile(0.50), percentile(0.90), percentile(0.95), percentile(0.99), sum / static_cast<int64_t>(sorted.size()), sorted.back()};
 }
 
 double ThroughputCounter::take(double seconds) {
@@ -57,6 +58,11 @@ std::string to_json(const MetricsSnapshot& s) {
       << "\"p90_us\":"     << s.p90_us       << ","
       << "\"p95_us\":"     << s.p95_us       << ","
       << "\"p99_us\":"     << s.p99_us       << ","
+      << "\"wait_avg_us\":" << s.wait_avg_us << ","
+      << "\"wait_max_us\":" << s.wait_max_us << ","
+      << "\"cpu_pct\":" << s.cpu_percent << ","
+      << "\"lock_wait_us\":" << s.lock_wait_us << ","
+      << "\"lock_contentions\":" << s.lock_contentions << ","
       << "\"tput\":"       << std::setprecision(1) << s.throughput << ","
       << "\"fairness\":"   << std::setprecision(4) << s.fairness   << ","
       << "\"sr_hft\":"     << s.service_ratio[0]   << ","
@@ -81,7 +87,9 @@ std::string to_json(const MetricsSnapshot& s) {
         if (i) o << ',';
         o << "[" << std::setprecision(2) << s.asks[i].price << ',' << s.asks[i].quantity << "]";
     }
-    o << "]}"
+    o << "],\"fills\":" << s.fills << ",\"partial_fills\":" << s.partial_fills << "},\"workers\":[";
+    for (size_t i = 0; i < s.worker_activity.size(); ++i) { if (i) o << ','; o << s.worker_activity[i]; }
+    o << "]"
       << "}";
     return o.str();
 }

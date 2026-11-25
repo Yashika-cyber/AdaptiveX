@@ -2,6 +2,7 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
   CartesianGrid, Tooltip, Legend,
 } from 'recharts'
+import MetricHelp from './MetricHelp'
 
 const FMT = (v) => v ? v.toLocaleString() + 'µs' : '—'
 
@@ -15,7 +16,7 @@ function CustomTooltip({ active, payload, label }) {
       <div style={{ color: 'var(--text-muted)', marginBottom: 4 }}>t={label}s</div>
       {payload.map(p => (
         <div key={p.dataKey} style={{ color: p.stroke }}>
-          {p.dataKey === 'p50' ? 'p50' : 'p99'}: {p.value?.toLocaleString()} µs
+          {p.dataKey}: {p.value?.toLocaleString()} µs
         </div>
       ))}
     </div>
@@ -24,15 +25,17 @@ function CustomTooltip({ active, payload, label }) {
 
 export default function LatencyChart({ snapshot, history }) {
   const data = history.t.map((t, i) => ({
-    t, p50: history.p50[i], p99: history.p99[i],
+    t, p50: history.p50[i], p90: history.p90[i], p95: history.p95[i], p99: history.p99[i],
   }))
 
   const p50 = snapshot?.p50_us ?? 0
+  const p90 = snapshot?.p90_us ?? 0
+  const p95 = snapshot?.p95_us ?? 0
   const p99 = snapshot?.p99_us ?? 0
 
   return (
     <div className="panel">
-      <div className="panel-label">Latency</div>
+      <div className="panel-label">Latency <MetricHelp text="Time from entering the engine queue to order completion, measured in microseconds." /></div>
       <p className="card-description">Queue-to-completion time. p50 is typical latency; p99 highlights slow tail behaviour.</p>
       <div style={{ height: 200 }}>
         <ResponsiveContainer width="100%" height="100%">
@@ -58,6 +61,8 @@ export default function LatencyChart({ snapshot, history }) {
             />
             <Tooltip content={<CustomTooltip />} />
             <Area type="monotone" dataKey="p99" stroke="#EF4444" strokeWidth={1.5} fill="url(#g99)" dot={false} />
+            <Area type="monotone" dataKey="p95" stroke="#F59E0B" strokeWidth={1.25} fill="none" dot={false} />
+            <Area type="monotone" dataKey="p90" stroke="#8B5CF6" strokeWidth={1.25} fill="none" dot={false} />
             <Area type="monotone" dataKey="p50" stroke="#3B82F6" strokeWidth={2}   fill="url(#g50)" dot={false} />
           </AreaChart>
         </ResponsiveContainer>
@@ -68,6 +73,8 @@ export default function LatencyChart({ snapshot, history }) {
           <div className="legend-line" style={{ background: '#3B82F6' }} />
           p50 <strong style={{ color: 'var(--text-primary)', marginLeft: 4 }}>{FMT(p50)}</strong>
         </div>
+        <div className="legend-item"><div className="legend-line" style={{ background: '#8B5CF6' }} />p90 <strong>{FMT(p90)}</strong></div>
+        <div className="legend-item"><div className="legend-line" style={{ background: '#F59E0B' }} />p95 <strong>{FMT(p95)}</strong></div>
         <div className="legend-item">
           <div className="legend-line" style={{ background: '#EF4444' }} />
           p99 <strong style={{ color: 'var(--text-primary)', marginLeft: 4 }}>{FMT(p99)}</strong>

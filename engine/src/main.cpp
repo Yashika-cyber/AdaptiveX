@@ -20,6 +20,7 @@
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <sys/resource.h>
 
 #include "order.hpp"
 #include "generator.hpp"
@@ -45,6 +46,7 @@ struct Config {
     size_t   high_water   = 500;
     size_t   low_water    = 100;
     int      symbols      = 20;
+    std::string book_symbol = "AAPL";
 };
 
 static Config parse_args(int argc, char* argv[]) {
@@ -58,6 +60,7 @@ static Config parse_args(int argc, char* argv[]) {
         else if (a == "--seed")       cfg.seed        = std::atoll(val());
         else if (a == "--workers")    cfg.workers     = std::atoi(val());
         else if (a == "--symbols")    cfg.symbols     = std::atoi(val());
+        else if (a == "--book-symbol") cfg.book_symbol = val();
         else if (a == "--high-water") cfg.high_water  = std::atoi(val());
         else if (a == "--low-water")  cfg.low_water   = std::atoi(val());
         else if (a == "--sync") {
@@ -80,7 +83,7 @@ static Config parse_args(int argc, char* argv[]) {
             std::fputs("Usage: adaptivex [--rate N] [--burst N] [--seconds N] "
                        "[--seed N] [--workers N] [--sync locked|lockfree] "
                        "[--policy priority|sjf|rr|adaptive] "
-                       "[--high-water N] [--low-water N] [--symbols N]\n", stderr);
+                       "[--high-water N] [--low-water N] [--symbols N] [--book-symbol SYMBOL]\n", stderr);
             std::exit(0);
         }
     }
@@ -120,6 +123,8 @@ int main(int argc, char* argv[]) {
 
     LatencyHistogram  latency_hist;
     ThroughputCounter tput;
+    std::vector<std::atomic<uint64_t>> worker_activity(cfg.workers);
+    std::atomic<uint64_t> fills_since_snapshot{0}, partial_fills_since_snapshot{0};
 
     std::atomic<bool> stop_generating{false};
     std::atomic<bool> stop_workers{false};
@@ -127,7 +132,7 @@ int main(int argc, char* argv[]) {
     LockFreeQueue lockfree_q;
 
     // ── Worker threads (matching) ─────────────────────────────
-    auto worker_fn = [&]() {
+    auto worker_fn = [&](int worker_id) {
         while (!stop_workers.load(std::memory_order_acquire) || ctrl.queue_size() > 0) {
             std::optional<Order> opt;
             opt = ctrl.pop_wait();
@@ -145,6 +150,9 @@ int main(int argc, char* argv[]) {
 
             // Order book matching
             auto fills = book.match(o);
+            worker_activity[worker_id].fetch_add(1, std::memory_order_relaxed);
+            fills_since_snapshot.fetch_add(fills.size(), std::memory_order_relaxed);
+            for (const auto& fill : fills) if (fill.partial) partial_fills_since_snapshot.fetch_add(1, std::memory_order_relaxed);
 
             // Record latency
             latency_hist.record(wait_us);
@@ -167,7 +175,7 @@ int main(int argc, char* argv[]) {
 
     std::vector<std::thread> workers;
     workers.reserve(cfg.workers);
-    for (int i = 0; i < cfg.workers; i++) workers.emplace_back(worker_fn);
+    for (int i = 0; i < cfg.workers; i++) workers.emplace_back(worker_fn, i);
 
     // The ingress channel is independently selectable; scheduler queues remain
     // policy-aware and mutex-protected.
@@ -217,17 +225,24 @@ int main(int argc, char* argv[]) {
     // ── Metrics loop (main thread) ────────────────────────────
     auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(cfg.seconds);
     int64_t t = 0;
+    rusage previous_usage{};
+    getrusage(RUSAGE_SELF, &previous_usage);
 
     while (std::chrono::steady_clock::now() < deadline) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
         ++t;
+        rusage current_usage{};
+        getrusage(RUSAGE_SELF, &current_usage);
+        const auto seconds = [](const timeval& value) { return value.tv_sec + value.tv_usec / 1'000'000.0; };
+        double cpu = (seconds(current_usage.ru_utime) + seconds(current_usage.ru_stime)) - (seconds(previous_usage.ru_utime) + seconds(previous_usage.ru_stime));
+        previous_usage = current_usage;
 
         // Update adaptive controller
         size_t qlen = ctrl.queue_size();
         if (cfg.adaptive) ctrl.tick(qlen);
 
         // Gather metrics
-        auto [p50, p90, p95, p99] = latency_hist.compute();
+        auto [p50, p90, p95, p99, wait_avg, wait_max] = latency_hist.compute();
         fairness.set_median_wait_us(p50);
         double through = tput.take(1.0);
         auto fair = fairness.compute();
@@ -241,6 +256,10 @@ int main(int argc, char* argv[]) {
         snap.p90_us       = p90;
         snap.p95_us       = p95;
         snap.p99_us       = p99;
+        snap.wait_avg_us  = wait_avg;
+        snap.wait_max_us  = wait_max;
+        snap.cpu_percent  = cpu * 100.0;
+        if (cfg.sync == SyncMode::LOCKED) { auto ls = locked_q.take_lock_stats(); snap.lock_contentions = ls.contentions; snap.lock_wait_us = ls.avg_wait_us; }
         snap.throughput   = through;
         snap.fairness     = fair.jain_index;
         for (int i = 0; i < NUM_TRADER_TYPES; i++)
@@ -254,10 +273,13 @@ int main(int argc, char* argv[]) {
         snap.wal_flush_count = ws.flush_count;
         snap.policy_switches = ctrl.switch_count();
         snap.queue_len       = qlen;
+        snap.fills = fills_since_snapshot.exchange(0, std::memory_order_relaxed);
+        snap.partial_fills = partial_fills_since_snapshot.exchange(0, std::memory_order_relaxed);
+        for (auto& count : worker_activity) snap.worker_activity.push_back(count.exchange(0, std::memory_order_relaxed));
         auto symbols = book.active_symbols();
         if (!symbols.empty()) {
-            std::sort(symbols.begin(), symbols.end());
-            snap.book_symbol = symbols.front();
+            auto selected = std::find(symbols.begin(), symbols.end(), cfg.book_symbol);
+            snap.book_symbol = selected != symbols.end() ? *selected : *std::min_element(symbols.begin(), symbols.end());
             for (const auto& level : book.bid_levels(snap.book_symbol))
                 snap.bids.push_back({level.price, level.total_qty});
             for (const auto& level : book.ask_levels(snap.book_symbol))

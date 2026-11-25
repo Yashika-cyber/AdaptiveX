@@ -17,6 +17,11 @@ struct MetricsSnapshot {
     int64_t p90_us = 0;
     int64_t p95_us = 0;
     int64_t p99_us = 0;
+    double wait_avg_us = 0.0;
+    int64_t wait_max_us = 0;
+    double cpu_percent = 0.0;
+    double lock_wait_us = 0.0;
+    uint64_t lock_contentions = 0;
     double throughput = 0.0;
     double fairness = 1.0;
     double service_ratio[3]{};
@@ -32,12 +37,15 @@ struct MetricsSnapshot {
     std::string book_symbol;
     std::vector<BookLevel> bids;
     std::vector<BookLevel> asks;
+    std::vector<uint64_t> worker_activity;
+    uint64_t fills = 0;
+    uint64_t partial_fills = 0;
 };
 
 class LatencyHistogram {
 public:
     void record(int64_t latency_us);
-    std::array<int64_t, 4> compute() const;
+    std::array<int64_t, 6> compute() const;
 
 private:
     mutable std::mutex mu_;

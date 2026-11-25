@@ -27,6 +27,7 @@ struct Fill {
     char symbol[8]{};
     double price = 0.0;
     uint32_t quantity = 0;
+    bool partial = false;
     std::chrono::steady_clock::time_point fill_time{};
 };
 

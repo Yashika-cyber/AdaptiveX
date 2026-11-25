@@ -3,6 +3,7 @@ const TRADERS = [
   { key: 'sr_retail', label: 'Retail',        color: '#F59E0B' },
   { key: 'sr_mm',     label: 'Market Maker',  color: '#8B5CF6' },
 ]
+import MetricHelp from './MetricHelp'
 
 function fairColor(j) {
   if (j >= 0.9) return 'var(--green)'
@@ -15,7 +16,7 @@ export default function FairnessGauge({ snapshot }) {
 
   return (
     <div className="panel">
-      <div className="panel-label">Fairness Index (Jain&apos;s)</div>
+      <div className="panel-label">Fairness Index (Jain&apos;s) <MetricHelp text="Jain’s index measures how evenly service is distributed. 1.0 means equal service." /></div>
       <p className="card-description">Shows how evenly completed work is shared across trader types; 1.0 is perfectly balanced.</p>
 
       <div className="fair-index" style={{ color: fairColor(j) }}>

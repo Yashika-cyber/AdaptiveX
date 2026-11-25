@@ -1,3 +1,5 @@
+import MetricHelp from './MetricHelp'
+
 export default function CacheMetrics({ snapshot }) {
   const pred = ((snapshot?.cache_pred ?? 0) * 100)
   const lru  = ((snapshot?.cache_lru  ?? 0) * 100)
@@ -5,7 +7,7 @@ export default function CacheMetrics({ snapshot }) {
 
   return (
     <div className="panel">
-      <div className="panel-label">Cache Comparison</div>
+      <div className="panel-label">Cache Comparison <MetricHelp text="A cache hit means the requested symbol was already in cache; higher is better." /></div>
       <p className="card-description">Hit rate for the predictive cache compared with the LRU baseline.</p>
       <div className="cache-compare">
         <div>

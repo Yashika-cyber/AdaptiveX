@@ -6,9 +6,10 @@ const HISTORY_LEN = 90  // seconds of history to keep
 
 export function useMetrics() {
   const [snapshot, setSnapshot] = useState(null)
-  const [history,  setHistory]  = useState({ p50: [], p99: [], tput: [], t: [] })
+  const [history,  setHistory]  = useState({ p50: [], p90: [], p95: [], p99: [], tput: [], t: [] })
   const [status,   setStatus]   = useState('connecting')  // connecting | live | demo | error
   const [config,   setConfig]   = useState(null)
+  const [updatedAt, setUpdatedAt] = useState(null)
   const wsRef = useRef(null)
   const retryRef = useRef(null)
 
@@ -31,10 +32,13 @@ export function useMetrics() {
           if (msg.type === 'snapshot') {
             const d = msg.data
             setSnapshot(d)
+            setUpdatedAt(Date.now())
             setHistory(h => {
               const push = (arr, v) => [...arr, v].slice(-HISTORY_LEN)
               return {
                 p50:  push(h.p50,  d.p50_us),
+                p90:  push(h.p90,  d.p90_us),
+                p95:  push(h.p95,  d.p95_us),
                 p99:  push(h.p99,  d.p99_us),
                 tput: push(h.tput, d.tput),
                 t:    push(h.t,    d.t),
@@ -78,5 +82,5 @@ export function useMetrics() {
   const start = useCallback(next => request('/start', { method: 'POST', body: JSON.stringify(next || config || {}) }), [request, config])
   const stop = useCallback(() => request('/stop', { method: 'POST' }), [request])
   const reset = useCallback(() => request('/reset', { method: 'POST' }), [request])
-  return { snapshot, history, status, config, saveConfig, start, stop, reset }
+  return { snapshot, history, status, config, updatedAt, saveConfig, start, stop, reset }
 }
