@@ -1,0 +1,13 @@
+# High load experiment: near-saturation burst, lockfree comparison
+name: highload
+rate: 3000
+burst: 10000
+seconds: 120
+seed: 42
+workers: 8
+sync: lockfree
+policy: adaptive
+high_water: 300
+low_water: 80
+symbols: 20
+repeats: 5

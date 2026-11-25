@@ -1,0 +1,14 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+
+engine/build/
+engine/build-*/
+
+server/.venv/
+
+dashboard/node_modules/
+dashboard/dist/
+
+experiments/results/*.jsonl
+experiments/results/*.csv

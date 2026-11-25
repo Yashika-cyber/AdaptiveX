@@ -1,0 +1,165 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600&display=swap');
+
+/* ── Design tokens ─────────────────────────────────────────── */
+:root {
+  --bg-base:     #060D1F;
+  --bg-surface:  #0D1B2A;
+  --bg-elevated: #132436;
+  --border:      #1E3A5F;
+  --text-primary:   #E8F4FD;
+  --text-secondary: #7BA3C4;
+  --text-muted:     #3D6080;
+  --blue:   #3B82F6;
+  --blue-dim: #1E40AF;
+  --green:  #10B981;
+  --amber:  #F59E0B;
+  --red:    #EF4444;
+  --purple: #8B5CF6;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-sans: 'Space Grotesk', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; background: var(--bg-base); color: var(--text-primary); }
+body { font-family: var(--font-sans); font-size: 14px; overflow-x: hidden; }
+
+#root { min-height: 100vh; }
+
+/* ── App shell ─────────────────────────────────────────────── */
+.app { display: flex; flex-direction: column; min-height: 100vh; }
+
+/* ── Burst banner ──────────────────────────────────────────── */
+.burst-banner {
+  background: rgba(245,158,11,.12);
+  border-top: 1px solid rgba(245,158,11,.4);
+  border-bottom: 1px solid rgba(245,158,11,.4);
+  color: var(--amber);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-align: center;
+  padding: 5px;
+  animation: pulse-bg 2s infinite;
+}
+
+@keyframes pulse-bg {
+  0%, 100% { background: rgba(245,158,11,.12); }
+  50%       { background: rgba(245,158,11,.22); }
+}
+
+/* ── Main grid ─────────────────────────────────────────────── */
+.main-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 220px 1fr 240px;
+  grid-template-rows: auto 60px auto;
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin: 12px;
+  overflow: hidden;
+}
+
+/* Full-width rows */
+.panel-timeline { grid-column: 1 / -1; }
+.panel-bottom   { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: var(--border); }
+
+/* ── Panel base ────────────────────────────────────────────── */
+.panel {
+  background: var(--bg-surface);
+  padding: 14px 16px;
+}
+
+.panel-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+/* ── Throughput card ───────────────────────────────────────── */
+.tput-value {
+  font-family: var(--font-mono);
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--blue);
+  line-height: 1;
+}
+.tput-unit { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin: 3px 0 10px; }
+.tput-delta { font-family: var(--font-mono); font-size: 11px; display: flex; align-items: center; gap: 3px; }
+.tput-delta.up   { color: var(--green); }
+.tput-delta.down { color: var(--red); }
+
+.mini-stats { margin-top: 18px; display: flex; flex-direction: column; gap: 7px; }
+.mini-stat  { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; }
+.mini-stat .lbl { color: var(--text-muted); }
+.mini-stat .val { color: var(--text-primary); }
+
+/* ── Latency chart ─────────────────────────────────────────── */
+.chart-wrap canvas { width: 100% !important; display: block; }
+.chart-legend { display: flex; gap: 16px; margin-top: 8px; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); }
+.legend-line { width: 14px; height: 2px; border-radius: 1px; }
+
+/* ── Fairness gauge ────────────────────────────────────────── */
+.fair-index { font-family: var(--font-mono); font-size: 32px; font-weight: 700; line-height: 1; }
+.fair-bar-bg { height: 5px; background: rgba(255,255,255,.05); border-radius: 3px; margin: 8px 0 16px; overflow: hidden; }
+.fair-bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--blue-dim), var(--green)); transition: width .8s ease; }
+
+.trader-rows { display: flex; flex-direction: column; gap: 10px; }
+.trader-name { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-bottom: 3px; }
+.trader-bar-bg { height: 4px; background: rgba(255,255,255,.04); border-radius: 2px; overflow: hidden; margin-bottom: 2px; }
+.trader-bar-fill { height: 100%; border-radius: 2px; transition: width .8s ease; }
+.trader-pct { font-family: var(--font-mono); font-size: 10px; color: var(--text-secondary); }
+
+/* ── Policy timeline ───────────────────────────────────────── */
+.timeline-track { display: flex; height: 36px; border-radius: 3px; overflow: hidden; gap: 1px; }
+.timeline-seg { display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: .5px; min-width: 2px; overflow: hidden; white-space: nowrap; }
+.seg-PRIORITY { background: rgba(139,92,246,.25); border-top: 2px solid var(--purple); color: var(--purple); }
+.seg-SJF      { background: rgba(59,130,246,.25); border-top: 2px solid var(--blue);   color: var(--blue); }
+.seg-RR       { background: rgba(16,185,129,.25); border-top: 2px solid var(--green);  color: var(--green); }
+
+/* ── Cache metrics ─────────────────────────────────────────── */
+.cache-compare { display: flex; flex-direction: column; gap: 12px; }
+.cache-row-label { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; margin-bottom: 3px; }
+.cache-name-txt { color: var(--text-secondary); }
+.cache-pct-txt  { color: var(--text-primary); font-weight: 500; }
+.cache-bar-bg   { height: 6px; background: rgba(255,255,255,.04); border-radius: 3px; overflow: hidden; }
+.cache-bar-fill { height: 100%; border-radius: 3px; transition: width .8s ease; }
+.cache-pred-fill { background: linear-gradient(90deg, var(--blue-dim), var(--blue)); }
+.cache-lru-fill  { background: rgba(100,120,150,.5); }
+.cache-advantage { margin-top: 10px; font-family: var(--font-mono); font-size: 10px; color: var(--green); }
+
+/* ── WAL metrics ───────────────────────────────────────────── */
+.wal-stats { display: flex; flex-direction: column; gap: 8px; }
+.wal-row   { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; }
+.wal-lbl   { color: var(--text-muted); }
+.wal-val   { color: var(--text-primary); }
+.wal-queue-label { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); letter-spacing: .8px; margin-top: 12px; margin-bottom: 4px; }
+.wal-queue-vis { display: flex; gap: 2px; height: 14px; }
+.wal-cell { flex: 1; border-radius: 2px; transition: background .4s; }
+
+/* ── Order book ────────────────────────────────────────────── */
+.book-sym { color: var(--blue); font-family: var(--font-mono); font-size: 10px; font-weight: 500; }
+.book-table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 11px; }
+.book-table th { color: var(--text-muted); font-weight: 400; font-size: 9px; letter-spacing: .5px; padding: 0 2px 5px; text-align: right; }
+.book-table th:first-child { text-align: left; }
+.book-table td { padding: 2px 2px; text-align: right; position: relative; }
+.book-table td:first-child { text-align: left; }
+.bid-qty { color: var(--green); }
+.ask-qty { color: var(--red); }
+.book-price { color: var(--text-primary); font-weight: 500; }
+.book-spread { text-align: center; font-size: 9px; color: var(--text-muted); padding: 3px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+
+/* ── Responsive ────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .main-grid { grid-template-columns: 1fr 1fr; }
+  .panel-timeline { grid-column: 1 / -1; }
+  .panel-bottom { grid-template-columns: 1fr; }
+}
